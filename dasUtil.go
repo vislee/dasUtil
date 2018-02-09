@@ -4,6 +4,7 @@
 */
 
 // Package dasUtil provides a log data aggregation and select util.
+//
 // 数据的聚合查询组件
 package dasUtil
 
@@ -21,8 +22,10 @@ import (
 type index struct {
 	// 索引字段值， 行引用集合
 	idx map[string]Rows
+
 	// 索引字段名
 	idxName string
+
 	sync.RWMutex
 }
 
@@ -50,7 +53,8 @@ func (i *index) get(val string) (r Rows, ok bool) {
 }
 
 
-// Row is a log record, in the form of the key-val.
+// Row is a log record, save in the form of the key-val.
+//
 // 一条日志记录，以key-val的形式存储在内存中。
 type Row struct {
 	colsmap map[string]string
@@ -59,7 +63,7 @@ type Row struct {
 }
 
 
-var RowPool = &sync.Pool{
+var rowPool = &sync.Pool{
 	New: func() interface{} {
 		var r *Row = new(Row)
 		r.cites = 0
@@ -70,16 +74,18 @@ var RowPool = &sync.Pool{
 
 
 // NewRow returns an empty Row struct.
+//
 // 返回一个空的Row结构。
 func NewRow() *Row {
-	r := RowPool.Get().(*Row)
+	r := rowPool.Get().(*Row)
 	return r
 }
 
 // NewColsRow returns an Row.
+//
 // 返回一个Row结构体，其内容为输入的字典。
 func NewColsRow(c map[string]string) *Row {
-	r := RowPool.Get().(*Row)
+	r := rowPool.Get().(*Row)
 	if c != nil {
 		r.colsmap = c
 	}
@@ -99,10 +105,11 @@ func (r *Row) destroy() {
 		delete(r.colsmap, k)
 	}
 
-	RowPool.Put(r)
+	rowPool.Put(r)
 }
 
 // Get returns the value of the key.
+//
 // 返回key对应的值。
 func (r *Row) Get(key string) (v string, ok bool) {
 	r.RLock()
@@ -112,6 +119,7 @@ func (r *Row) Get(key string) (v string, ok bool) {
 }
 
 // GetNull returns the value of the key, otherwise empty string.
+//
 // 返回key对应的值，不存在则返回空字符串。
 func (r *Row) GetNull(key string) string {
 	r.RLock()
@@ -125,6 +133,7 @@ func (r *Row) GetNull(key string) string {
 
 
 // GetDefault returns the value of the key, otherwise default string.
+//
 // 返回key对应的值，不存在则返回缺省字符串。
 func (r *Row) GetDefault(key, d string) string {
 	r.RLock()
@@ -138,6 +147,7 @@ func (r *Row) GetDefault(key, d string) string {
 
 
 // Set add a key and value.
+//
 // 添加一个字段和对应的值。
 func (r *Row) Set(key, val string) {
 	r.Lock()
@@ -145,7 +155,8 @@ func (r *Row) Set(key, val string) {
 	r.Unlock()
 }
 
-// JsonParse Parsing the json string fill the Row。
+// JsonParse Parsing the json string fill the Row.
+//
 // 解析json字符串填充该Row结构体。
 func (r *Row) JsonParse(js *string) error {
 	r.Lock()
@@ -154,6 +165,7 @@ func (r *Row) JsonParse(js *string) error {
 }
 
 // SplitParse split the string s fill the Row. sep is the delimiter, cols is collection for key.
+//
 // 以sep分割字符串s，填充该Row结构。cols为对应字段的key。
 func (r *Row) SplitParse(s, sep *string, cols []string) {
 	r.Lock()
@@ -174,10 +186,12 @@ func (r *Row) SplitParse(s, sep *string, cols []string) {
 
 
 // Rows the collection of Row. The multiple log record.
+//
 // Row的集合，多条日志记录。
 type Rows []*Row
 
 // NewRows returns the Rows.
+//
 // 返回一个日志集合。
 func NewRows() Rows {
 	return Rows{}
@@ -190,6 +204,7 @@ func (rs *Rows) insert(rows []*Row) {
 
 
 // InsertRow insert the Row.
+//
 // InsertRow 插入一行数据.
 func (rs *Rows) InsertRow(r *Row) {
 	*rs = append(*rs, r)
@@ -221,6 +236,7 @@ func (rs orderRows) Swap(i, j int) {
 
 
 // Orderby with item descending order.
+//
 // Orderby 根据item降序排序.
 func (r Rows) Orderby(item string) {
 	or := orderRows{r, item}
@@ -263,23 +279,27 @@ func (t groupTableOrderByItem) Swap(i, j int) {
 
 
 // GroupTable a group of table.
+//
 // 表集合
 type GroupTable struct {
 	// child table list
 	GrptabList tableList
+
 	groupTable map[string]*Table
 	groupCol   []string
+
+	// parent table size
 	ParentSize uint
 }
 
-var GroupTablePool = &sync.Pool{
+var groupTablePool = &sync.Pool{
 	New: func() interface{} {
 		return new(GroupTable)
 	},
 }
 
 func newGroupTable(col []string) *GroupTable {
-	gt, ok := GroupTablePool.Get().(*GroupTable)
+	gt, ok := groupTablePool.Get().(*GroupTable)
 	if !ok {
 		gt = new(GroupTable)
 	}
@@ -291,58 +311,62 @@ func newGroupTable(col []string) *GroupTable {
 
 
 // Destroy destroy the a group of table.
+//
 // 销毁一组表集合。
-func (gpt *GroupTable) Destroy() {
-	for _, k := range gpt.GrptabList {
+func (g *GroupTable) Destroy() {
+	for _, k := range g.GrptabList {
 		k.Destroy()
 	}
-	gpt.GrptabList = nil
-	gpt.groupTable = nil
-	gpt.groupCol = nil
-	GroupTablePool.Put(gpt)
+	g.GrptabList = nil
+	g.groupTable = nil
+	g.groupCol = nil
+	groupTablePool.Put(g)
 }
 
 
 // OrderbyTopN
+//
 //子表排序，根据group以后的子表的数据量降序排序子表
-func (gpt *GroupTable) OrderbyTopN(n int) []*Table {
-	if len(gpt.GrptabList) == 0 {
+func (g *GroupTable) OrderbyTopN(n int) []*Table {
+	if len(g.GrptabList) == 0 {
 		return make([]*Table, 0, 0)
 	}
 
-	sort.Sort(gpt.GrptabList)
+	sort.Sort(g.GrptabList)
 	m := n
-	if m > len(gpt.GrptabList) {
-		m = len(gpt.GrptabList)
+	if m > len(g.GrptabList) {
+		m = len(g.GrptabList)
 	}
 
-	return gpt.GrptabList[:m]
+	return g.GrptabList[:m]
 }
 
 
 // OrderbyDescTopN
+//
 //子表排序，根据group以后的子表的数据量升序排序子表
-func (gpt *GroupTable) OrderbyDescTopN(n int) []*Table {
-	if len(gpt.GrptabList) == 0 {
+func (g *GroupTable) OrderbyDescTopN(n int) []*Table {
+	if len(g.GrptabList) == 0 {
 		return make([]*Table, 0, 0)
 	}
 
-	sort.Sort(sort.Reverse(gpt.GrptabList))
+	sort.Sort(sort.Reverse(g.GrptabList))
 	m := n
-	if m > len(gpt.GrptabList) {
-		m = len(gpt.GrptabList)
+	if m > len(g.GrptabList) {
+		m = len(g.GrptabList)
 	}
-	return gpt.GrptabList[:m]
+	return g.GrptabList[:m]
 }
 
 // OrderbyItemTopN
+//
 //子表排序：根据group时的sum某个字段降序排序子表
-func (gpt *GroupTable) OrderbyItemTopN(item string, n int) []*Table {
-	if len(gpt.GrptabList) == 0 {
+func (g *GroupTable) OrderbyItemTopN(item string, n int) []*Table {
+	if len(g.GrptabList) == 0 {
 		return make([]*Table, 0, 0)
 	}
 
-	gto := groupTableOrderByItem{item, gpt.GrptabList}
+	gto := groupTableOrderByItem{item, g.GrptabList}
 	sort.Sort(gto)
 	m := n
 	if m > len(gto.GrptabList) {
@@ -354,6 +378,7 @@ func (gpt *GroupTable) OrderbyItemTopN(item string, n int) []*Table {
 
 
 // Table a set of data collection.
+//
 // 一组数据的集合。
 type Table struct {
 	// The name of this set.
@@ -373,16 +398,17 @@ type Table struct {
 	sync.RWMutex
 }
 
-var TablePool = sync.Pool{
+var tablePool = sync.Pool{
 	New: func() interface{} {
 		return new(Table)
 	},
 }
 
 // NewTable returns a table.
+//
 // 创建一个table。name是table的名称。idxCol是索引字段。sumCol是求和字段。countCol是字段对应的值的次数统计。
 func NewTable(name string, idxCol []string, sumCol []string, countCol map[string][]string) *Table {
-	tb, ok := TablePool.Get().(*Table)
+	tb, ok := tablePool.Get().(*Table)
 	if !ok {
 		tb = new(Table)
 	}
@@ -417,6 +443,7 @@ func NewTable(name string, idxCol []string, sumCol []string, countCol map[string
 
 
 // Destroy destroy the table.
+//
 // 销毁一个table。
 func (tb *Table) Destroy() {
 	tb.RLock()
@@ -431,11 +458,12 @@ func (tb *Table) Destroy() {
 	tb.index = nil
 	tb.SumCol = nil
 
-	TablePool.Put(tb)
+	tablePool.Put(tb)
 }
 
 
 // Insert insert a Row into a Table.
+//
 // 插入一行数据到一个表。
 func (tb *Table) Insert(r *Row) {
 	tb.Lock()
@@ -492,6 +520,7 @@ func (tb *Table) Insert(r *Row) {
 
 
 // Select query a Rows from this Table.
+//
 // 查询符合条件的数据
 func (tb *Table) Select(item map[string]string) Rows {
 	rows := NewRows()
@@ -507,10 +536,16 @@ func (tb *Table) Select(item map[string]string) Rows {
 
 
 // GroupBy according to a set of fields group, returned to the GroupTable.
+//
 // 根据某一组字段分组，返回为子表的集合
+//
+//
 // columns 分组字段
+//
 // index 子表索引
+//
 // sum 子表累加字段
+//
 // count 字表复合条件的记录数
 func (tb *Table) GroupBy(columns []string, index []string, sum []string, count map[string][]string) *GroupTable {
 	gt := newGroupTable(columns)
@@ -541,6 +576,7 @@ func (tb *Table) GroupBy(columns []string, index []string, sum []string, count m
 
 
 // Join merge tb2 into this table.
+//
 // 合并两个表
 func (tb *Table) Join(tb2 *Table) {
 	for _, r := range tb2.Rows {
