@@ -3,7 +3,7 @@ About
 
 This is the log *D*ata *A*ggregation and *S*elect *Util* package, So I called dasUtil.
 
-这是一个日志数据聚合、查询的通用组件。
+这是一个日志数据聚合、查询的通用组件。非常高效，可用来处理在线日志。
 
 
 Table of Contents
@@ -28,13 +28,19 @@ After this command *dasUtil* is ready to use. Its source will be in:
 
 [Back to TOC](#table-of-contents)
 
+
 Example
 =======
+
+
+
 
 [Back to TOC](#table-of-contents)
 
 Docs
 ====
+
+
 
 [Back to TOC](#table-of-contents)
 

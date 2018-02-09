@@ -1,200 +1,235 @@
 package dasUtil
 
 import (
-	"strconv"
+	"fmt"
 	"testing"
 )
 
 func TestInsert(t *testing.T) {
-	gp := NewGroup("domain", []string{}, []string{})
-	r1 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test.php"}
-	gp.Insert(r1)
-	if len(gp.Rows) != 1 || gp.GroupName != "domain" || gp.GroupSize != 1 || gp.Rows[0]["ip"] != "192.168.1.1" {
-		t.Error("group insert error")
+	tb := NewTable("domain", []string{}, []string{}, nil)
+	r1 := NewRow()
+	log := "liwq.com\\t192.168.1.1\\t/test.php"
+	sep := "\\t"
+	r1.SplitParse(&log, &sep, []string{"domain", "ip", "path"})
+	tb.Insert(r1)
+	if len(tb.Rows) != 1 || tb.TabName != "domain" || tb.TabSize != 1 || tb.Rows[0].GetNull("ip") != "192.168.1.1" {
+		t.Error("table insert error")
 	}
+	tb.Destroy()
 }
 
 func TestIndex(t *testing.T) {
-	gp := NewGroup("domain", []string{"ip", "path"}, []string{})
-	r1 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test.php"}
-	gp.Insert(r1)
-	if len(gp.index) != 2 {
-		t.Error("group index column error")
+	sep := "\\t"
+	tb := NewTable("domain", []string{"ip", "path"}, []string{}, nil)
+	r1 := NewRow()
+	log := "liwq.com\\t192.168.1.1\\t/test.php"
+	r1.SplitParse(&log, &sep, []string{"domain", "ip", "path"})
+	tb.Insert(r1)
+	if len(tb.index) != 2 {
+		t.Error("table index error")
 	}
-	if _, ok := gp.index["ip"]; !ok {
-		t.Error("group index colunm no ip")
+	if _, ok := tb.index["ip"]; !ok {
+		t.Error("table index no ip")
 	}
-	if _, ok := gp.index["path"]; !ok {
-		t.Error("group index column no path")
+	if _, ok := tb.index["path"]; !ok {
+		t.Error("table index no path")
 	}
+	tb.Destroy()
 }
 
 func TestSelect(t *testing.T) {
-	gp := NewGroup("domain", []string{"ip"}, []string{})
-	r1 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test.php", "sent": "10"}
-	gp.Insert(r1)
-	r2 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "path": "/test.php", "sent": "20"}
-	gp.Insert(r2)
-	rs := gp.Select(map[string]string{"ip": "192.168.1.2"})
-	if len(rs) != 1 || rs[0]["ip"] != "192.168.1.2" {
-		t.Error("group select result error")
+	sep := "\\t"
+	tb := NewTable("domain", []string{"ip"}, []string{}, nil)
+	r1 := NewRow()
+	// r1 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test.php", "sent": "10"}
+	log := "liwq.com\\t192.168.1.1\\t/test.php\\t10"
+	r1.SplitParse(&log, &sep, []string{"domain", "ip", "path", "sent"})
+	tb.Insert(r1)
+	r2 := NewRow()
+	// r2 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "path": "/test.php", "sent": "20"}
+	log = "liwq.com\\t192.168.1.2\\t/test.php\\t20"
+	r2.SplitParse(&log, &sep, []string{"domain", "ip", "path", "sent"})
+	tb.Insert(r2)
+	rs := tb.Select(map[string]string{"ip": "192.168.1.2"})
+	if len(rs) != 1 || rs[0].GetNull("ip") != "192.168.1.2" {
+		t.Error("table select error")
+	}
+	tb.Destroy()
+}
+
+func TestGroupTable(t *testing.T) {
+	sep := "\\t"
+	colms := []string{"domain", "ip", "path", "sent", "status"}
+	tb := NewTable("domain", []string{"ip", "path"}, []string{}, nil)
+
+	r1 := NewRow()
+	log1 := "liwq.com\\t192.168.1.1\\t/test.php\\t10\\t200"
+	r1.SplitParse(&log1, &sep, colms)
+	tb.Insert(r1)
+
+	r2 := NewRow()
+	log2 := "liwq.com\\t192.168.1.1\\t/test2.php\\t10\\t200"
+	r2.SplitParse(&log2, &sep, colms)
+	tb.Insert(r2)
+
+	r3 := NewRow()
+	log3 := "liwq.com\\t192.168.1.1\\t/test3.php\\t10\\t504"
+	r3.SplitParse(&log3, &sep, colms)
+	tb.Insert(r3)
+
+	r4 := NewRow()
+	log4 := "liwq.com\\t192.168.1.2\\t/test.php\\t20\\t504"
+	r4.SplitParse(&log4, &sep, colms)
+	tb.Insert(r4)
+
+	r5 := NewRow()
+	log5 := "liwq.com\\t192.168.1.2\\t/test.php\\t20\\t502"
+	r5.SplitParse(&log5, &sep, colms)
+	tb.Insert(r5)
+
+	r6 := NewRow()
+	log6 := "liwq.com\\t192.168.1.3\\t/test.php\\t10\\t603"
+	r6.SplitParse(&log6, &sep, colms)
+	tb.Insert(r6)
+
+	grptb := tb.GroupBy([]string{"ip"}, []string{}, []string{"sent"}, map[string][]string{"status": []string{"502", "504", "200", "50x", "5xx"}})
+	if len(grptb.GrptabList) != 3 || grptb.ParentSize != 6 {
+		t.Errorf("group table error %d %d", len(grptb.GrptabList), grptb.ParentSize)
+	}
+
+	tbs := grptb.OrderbyTopN(1)
+	if len(tbs) != 1 {
+		t.Error("group table order error")
+	}
+
+	if len(tbs[0].Rows) != 3 || tbs[0].TabSize != 3 {
+		t.Error("group table order rows error")
+	}
+
+	if tbs[0].Rows[0].GetNull("ip") != "192.168.1.1" {
+		t.Error("group table order row error")
+	}
+
+	if tbs[0].SumCol["sent"] != 30 {
+		t.Error("group table sum error")
+	}
+
+	if tbs[0].CountCol["status:200"] != 2 || tbs[0].CountCol["status:504"] != 1 {
+		t.Error("group table count error")
+	}
+
+	tbsBysent := grptb.OrderbyItemTopN("sent", 1)
+	if len(tbsBysent) != 1 {
+		t.Error("group table order by item error")
+	}
+
+	if len(tbsBysent[0].Rows) != 2 || tbsBysent[0].TabSize != 2 {
+		t.Error("group table order by item rows error")
+	}
+
+	if tbsBysent[0].Rows[0].GetNull("ip") != "192.168.1.2" {
+		t.Error("group table order by item row error")
+	}
+
+	if tbsBysent[0].SumCol["sent"] != 40 {
+		t.Error("group table order by item sum error")
+	}
+
+	if tbsBysent[0].CountCol["status:502"] != 1 || tbsBysent[0].CountCol["status:50x"] != 2 {
+		fmt.Println(tbsBysent[0].CountCol)
+		t.Error("group table order by item count error", tbsBysent[0].CountCol["status:502"])
+	}
+
+	grptb2 := tb.GroupBy([]string{"ip", "path"}, []string{}, []string{}, nil)
+	if len(grptb2.GrptabList) != 5 || grptb2.ParentSize != 6 {
+		t.Errorf("group table many col error")
+	}
+
+	tbs2 := grptb2.OrderbyTopN(1)
+	if len(tbs2) != 1 {
+		t.Error("group table many col order error")
+	}
+
+	if len(tbs2[0].Rows) != 2 || tbs2[0].TabSize != 2 {
+		t.Error("group table many col order rows error")
+	}
+
+	if tbs2[0].Rows[0].GetNull("ip") != "192.168.1.2" {
+		t.Error("group table many col order row error")
+	}
+
+	if tbs2[0].TabName != "192.168.1.2-/test.php" {
+		t.Error("group table table name error")
+	}
+
+	tbs3 := grptb.OrderbyDescTopN(1)
+	if tbs3[0].TabSize != 1 || tbs3[0].Rows[0].GetNull("ip") != "192.168.1.3" {
+		t.Error("group table orderdesc error")
 	}
 }
 
-func TestAssembleGroup(t *testing.T) {
-	gp := NewGroup("domain", []string{"ip", "path"}, []string{})
-	r1 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test.php", "sent": "10"}
-	gp.Insert(r1)
-	r2 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test2.php", "sent": "10"}
-	gp.Insert(r2)
-	r3 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test3.php", "sent": "10"}
-	gp.Insert(r3)
-	r4 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "path": "/test.php", "sent": "20"}
-	gp.Insert(r4)
-	r5 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "path": "/test.php", "sent": "20"}
-	gp.Insert(r5)
-	r6 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.3", "path": "/test.php", "sent": "10"}
-	gp.Insert(r6)
-	agp := gp.GroupBy([]string{"ip"}, []string{}, []string{"sent"})
-	if len(agp.GroupList) != 3 || agp.AllGroupSize != 6 {
-		t.Error("assemblegroup groupby error")
-	}
-
-	top1 := agp.OrderbyTopN(1)
-	if len(top1) != 1 {
-		t.Error("assemblegroup orderby error")
-	}
-
-	if len(top1[0].Rows) != 3 || top1[0].GroupSize != 3 {
-		t.Error("assemblegroup orderby rows error")
-	}
-
-	if top1[0].Rows[0]["ip"] != "192.168.1.1" {
-		t.Error("assemblegroup orderby row content error")
-	}
-
-	if top1[0].SumCol["sent"] != 30 {
-		t.Error("assemblegroup sum error")
-	}
-
-	topsent1 := agp.OrderbyItemTopN("sent", 1)
-	if len(topsent1) != 1 {
-		t.Error("assemblegroup orderby item error")
-	}
-
-	if len(topsent1[0].Rows) != 2 || topsent1[0].GroupSize != 2 {
-		t.Error("assemblegroup orderby item rows error")
-	}
-
-	if topsent1[0].Rows[0]["ip"] != "192.168.1.2" {
-		t.Error("assemblegroup orderby item row content error")
-	}
-
-	if topsent1[0].SumCol["sent"] != 40 {
-		t.Error("assemblegroup orderby item sum error")
-	}
-
-	agp2 := gp.GroupBy([]string{"ip", "path"}, []string{}, []string{})
-	if len(agp2.GroupList) != 5 || agp2.AllGroupSize != 6 {
-		t.Error("assemblegroup many col groupby error")
-	}
-
-	agp2top1 := agp2.OrderbyTopN(1)
-	if len(agp2top1) != 1 {
-		t.Error("assemblegroup many col orderby error")
-	}
-
-	if len(agp2top1[0].Rows) != 2 || agp2top1[0].GroupSize != 2 {
-		t.Error("assemblegroup many col orderby rows error")
-	}
-
-	if agp2top1[0].Rows[0]["ip"] != "192.168.1.2" {
-		t.Error("assemblegroup many col orderby row error")
-	}
-
-	if agp2top1[0].GroupName != "192.168.1.2-/test.php" {
-		t.Error("assemblegroup group name error")
-	}
-
-	agp2dtop1 := agp2.OrderbyDescTopN(1)
-	if agp2dtop1[0].GroupSize != 1 || (agp2dtop1[0].Rows[0]["ip"] != "192.168.1.3" && agp2dtop1[0].Rows[0]["ip"] != "192.168.1.1") {
-		t.Error("assemblegroup orderdesc error")
-	}
-}
-
-func TestAssembleGroup2(t *testing.T) {
-	gp := NewGroup("domain", []string{"ip", "path"}, []string{})
+func TestGroupTable2(t *testing.T) {
+	tb := NewTable("domain", []string{"ip", "path"}, []string{}, nil)
 	r1 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/"}
-	gp.Insert(r1)
+	tb.Insert(NewColsRow(r1))
 	r2 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/"}
-	gp.Insert(r2)
+	tb.Insert(NewColsRow(r2))
 	r3 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/"}
-	gp.Insert(r3)
+	tb.Insert(NewColsRow(r3))
 	r4 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "path": "/"}
-	gp.Insert(r4)
+	tb.Insert(NewColsRow(r4))
 
-	agp := gp.GroupBy([]string{"path"}, []string{}, []string{})
-	if len(agp.GroupList) != 1 || agp.AllGroupSize != 4 {
-		t.Error("assemblegroup table error")
+	grptb := tb.GroupBy([]string{"path"}, []string{}, []string{}, nil)
+	if len(grptb.GrptabList) != 1 || grptb.ParentSize != 4 {
+		t.Error("group table error")
 	}
 
-	if len(agp.groupMap) != 1 {
-		t.Error("assemblegroup num error")
+	if len(grptb.groupTable) != 1 {
+		t.Error("group table num error")
 	}
 
-	top1 := agp.OrderbyTopN(1)
-	if len(top1) != 1 {
-		t.Error("assemblegroup orderby error")
+	tbs := grptb.OrderbyTopN(1)
+	if len(tbs) != 1 {
+		t.Error("group table order error")
 	}
+	tb.Destroy()
+	grptb.Destroy()
 }
 
-func TestGroupJoin(t *testing.T) {
-	gp := NewGroup("domain", []string{"ip", "path"}, []string{})
+func TestJoinTable(t *testing.T) {
+	tb := NewTable("domain", []string{"ip", "path"}, []string{}, nil)
 	r1 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test.php"}
-	gp.Insert(r1)
+	tb.Insert(NewColsRow(r1))
 	r2 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test2.php"}
-	gp.Insert(r2)
+	tb.Insert(NewColsRow(r2))
 	r3 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test3.php"}
-	gp.Insert(r3)
+	tb.Insert(NewColsRow(r3))
 	r4 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "path": "/test.php"}
-	gp.Insert(r4)
+	tb.Insert(NewColsRow(r4))
 	r5 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "path": "/test.php"}
-	gp.Insert(r5)
+	tb.Insert(NewColsRow(r5))
 	r6 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.3", "path": "/test.php"}
-	gp.Insert(r6)
+	tb.Insert(NewColsRow(r6))
 
-	gp2 := NewGroup("domain", []string{}, []string{})
+	tb2 := NewTable("domain", []string{}, []string{}, nil)
 	r21 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test.php"}
-	gp2.Insert(r21)
+	tb2.Insert(NewColsRow(r21))
 	r22 := map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "path": "/test2.php"}
-	gp2.Insert(r22)
+	tb2.Insert(NewColsRow(r22))
 
-	gp1size := gp.GroupSize
+	tb1size := tb.TabSize
 
-	gp.Join(gp2)
-	if gp.GroupSize != gp1size+gp2.GroupSize {
-		t.Error("group join size error", gp.GroupSize)
+	tb.Join(tb2)
+	if tb.TabSize != tb1size+tb2.TabSize {
+		t.Error("table join size error", tb.TabSize)
 	}
-	agp := gp.GroupBy([]string{"ip"}, []string{}, []string{})
-	top1 := agp.OrderbyTopN(1)
-	if len(top1) != 1 {
-		t.Error("group join assemblegroup orderby error")
+	gtb := tb.GroupBy([]string{"ip"}, []string{}, []string{}, nil)
+	tbs := gtb.OrderbyTopN(1)
+	if len(tbs) != 1 {
+		t.Error("table join group order error")
 	}
-	if len(top1[0].Rows) != 5 || "192.168.1.1" != top1[0].Rows[0]["ip"] {
-		t.Error("group join assemblegroup rows error", len(top1[0].Rows))
+	if len(tbs[0].Rows) != 5 || "192.168.1.1" != tbs[0].Rows[0].GetNull("ip") {
+		t.Error("table join group rows error", len(tbs[0].Rows))
 	}
 }
 
-func TestRowsOrderby(t *testing.T) {
-	rs := NewRows()
-	rs.InsertRow(map[string]string{"domain": "liwq.com", "ip": "192.168.1.3", "test_order": "0"})
-	rs = append(rs, map[string]string{"domain": "liwq.com", "ip": "192.168.1.2", "test_order": "1"})
-	rs = append(rs, map[string]string{"domain": "liwq.com", "ip": "192.168.1.1", "test_order": "2"})
-	rs.Orderby("test_order")
-	for k, v := range rs {
-		n, e := strconv.ParseInt(v["test_order"], 10, 64)
-		if e != nil || 2-k != int(n) {
-			t.Error("test order by error")
-		}
-	}
-}
