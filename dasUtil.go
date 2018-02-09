@@ -1,9 +1,9 @@
-/* 
+/*
  Copyright liwq
  the data aggregation and select util package.
 */
 
-// Package dasUtil provides a log data aggregation and select util.
+// Package dasUtil provides the data aggregation and select util.
 //
 // 数据的聚合查询组件
 package dasUtil
@@ -53,9 +53,9 @@ func (i *index) get(val string) (r Rows, ok bool) {
 }
 
 
-// Row is a log record, save in the form of the key-val.
+// Row is a data record, save in the form of the key-val.
 //
-// 一条日志记录，以key-val的形式存储在内存中。
+// 一条数据记录，以key-val的形式存储在内存中。
 type Row struct {
 	colsmap map[string]string
 	cites   uint32
@@ -238,8 +238,8 @@ func (rs orderRows) Swap(i, j int) {
 // Orderby with item descending order.
 //
 // Orderby 根据item降序排序.
-func (r Rows) Orderby(item string) {
-	or := orderRows{r, item}
+func (rs Rows) Orderby(item string) {
+	or := orderRows{rs, item}
 	sort.Sort(or)
 }
 
@@ -360,7 +360,7 @@ func (g *GroupTable) OrderbyDescTopN(n int) []*Table {
 
 // OrderbyItemTopN
 //
-//子表排序：根据group时的sum某个字段降序排序子表
+//子表排序，根据group时的sum某个字段降序排序子表
 func (g *GroupTable) OrderbyItemTopN(item string, n int) []*Table {
 	if len(g.GrptabList) == 0 {
 		return make([]*Table, 0, 0)
