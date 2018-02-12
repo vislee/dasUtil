@@ -110,7 +110,7 @@ func main() {
         fmt.Printf("remote_addr: %s uri: %s byt: %s status: %s\n", r.GetNull("remote_addr"), r.GetNull("uri"), r.GetNull("byt"), r.GetNull("status"))
     }
     // output:
-    //remote_addr: 192.168.1.1 uri: /test.php byt: 30 status: 200
+    // remote_addr: 192.168.1.1 uri: /test.php byt: 30 status: 200
     // remote_addr: 192.168.1.1 uri: /test2.php byt: 10 status: 200
     // remote_addr: 192.168.1.1 uri: /test3.php byt: 10 status: 504
     // remote_addr: 192.168.1.1 uri: /test.php byt: 10 status: 500
